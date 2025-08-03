@@ -101,6 +101,24 @@ npm run android
 npm run web
 ```
 
+## 🔒 Authentication Persistence (AsyncStorage)
+
+The app automatically configures Firebase Auth to persist authentication state using AsyncStorage. This means users will remain logged in between app sessions.
+
+**Key Implementation Details:**
+
+- Uses `initializeAuth` with AsyncStorage persistence for React Native
+- Falls back gracefully if auth instance already exists
+- Properly handles React Native-specific authentication requirements
+- No additional configuration needed - works out of the box
+
+**What this solves:**
+
+- ✅ Authentication state persists between app sessions
+- ✅ Users don't need to re-login every time they open the app
+- ✅ Eliminates Firebase Auth warning about missing AsyncStorage
+- ✅ Follows Firebase best practices for React Native apps
+
 ## 🧪 Testing Authentication
 
 ### Test Cases to Verify
