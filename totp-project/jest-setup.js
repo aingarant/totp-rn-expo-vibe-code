@@ -17,6 +17,18 @@ jest.mock('react-native-keychain', () => ({
   resetGenericPassword: jest.fn(() => Promise.resolve()),
 }));
 
+// Mock expo-crypto
+jest.mock('expo-crypto', () => ({
+  getRandomBytes: jest.fn((length) => {
+    const array = new Uint8Array(length);
+    for (let i = 0; i < length; i++) {
+      array[i] = Math.floor(Math.random() * 256);
+    }
+    return array;
+  }),
+  digestStringAsync: jest.fn(() => Promise.resolve('mocked-hash')),
+}));
+
 // Mock Firebase
 jest.mock('firebase/app', () => ({
   initializeApp: jest.fn(),
@@ -46,12 +58,5 @@ jest.mock('firebase/firestore', () => ({
 jest.mock('expo-camera', () => ({
   Camera: {
     useCameraPermissions: jest.fn(() => [null, jest.fn()]),
-  },
-}));
-
-jest.mock('expo-barcode-scanner', () => ({
-  BarCodeScanner: {
-    usePermissions: jest.fn(() => [null, jest.fn()]),
-    scanFromURLAsync: jest.fn(),
   },
 }));

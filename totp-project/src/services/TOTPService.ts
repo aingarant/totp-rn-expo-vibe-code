@@ -1,7 +1,14 @@
-import { totp, authenticator } from 'otplib';
-import { HashAlgorithms } from 'otplib/core';
+import { totp, authenticator } from '@otplib/preset-browser';
 import * as thirtyTwo from 'thirty-two';
+import * as Crypto from 'expo-crypto';
 import { TOTPOptions, TOTPAccount, QRCodeResult } from '@/types';
+
+// Define algorithm constants for React Native compatibility
+const HashAlgorithms = {
+  SHA1: 'sha1',
+  SHA256: 'sha256',
+  SHA512: 'sha512',
+} as const;
 
 // Define proper algorithm types
 type HashAlgorithm = 'sha1' | 'sha256' | 'sha512';
@@ -254,13 +261,10 @@ export class TOTPService {
   }
 
   /**
-   * Generate a test secret for development/testing
+   * Generate a test secret for development/testing using expo-crypto
    */
   public generateTestSecret(): string {
-    const randomBytes = new Uint8Array(20);
-    for (let i = 0; i < randomBytes.length; i++) {
-      randomBytes[i] = Math.floor(Math.random() * 256);
-    }
+    const randomBytes = Crypto.getRandomBytes(20); // 160 bits for secure TOTP secret
     return thirtyTwo.encode(randomBytes).toString().replace(/=/g, '');
   }
 
@@ -337,7 +341,7 @@ export class TOTPService {
    */
   private mapAlgorithm(
     algorithm?: 'SHA1' | 'SHA256' | 'SHA512'
-  ): HashAlgorithms {
+  ): typeof HashAlgorithms[keyof typeof HashAlgorithms] {
     switch (algorithm) {
       case 'SHA1':
         return HashAlgorithms.SHA1;

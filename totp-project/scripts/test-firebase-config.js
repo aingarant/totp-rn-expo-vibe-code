@@ -28,11 +28,11 @@ console.log('==============================\n');
 console.log('1. Testing configuration values...');
 const requiredFields = [
   'apiKey',
-  'authDomain', 
+  'authDomain',
   'projectId',
   'storageBucket',
   'messagingSenderId',
-  'appId'
+  'appId',
 ];
 
 let configValid = true;
@@ -68,7 +68,7 @@ try {
   const app = initializeApp(config, 'test-app');
   const auth = getAuth(app);
   const db = getFirestore(app);
-  
+
   console.log('   ✅ Firebase Auth service initialized');
   console.log('   ✅ Firestore service initialized');
 } catch (error) {

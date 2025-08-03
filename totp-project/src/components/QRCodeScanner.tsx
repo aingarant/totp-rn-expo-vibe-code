@@ -7,7 +7,6 @@ import {
   Alert,
   Dimensions,
 } from 'react-native';
-import { BarCodeScanner } from 'expo-barcode-scanner';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { TOTPService } from '@/services/TOTPService';
 import { QRCodeResult } from '@/types';

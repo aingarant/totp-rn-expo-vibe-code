@@ -1,5 +1,9 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { initializeAuth, getAuth, Auth } from 'firebase/auth';
+import { 
+  initializeAuth, 
+  getAuth, 
+  Auth
+} from 'firebase/auth';
 import {
   getFirestore,
   Firestore,
@@ -54,16 +58,17 @@ let auth: Auth;
 try {
   debugLog('Initializing Firebase Auth with AsyncStorage persistence');
 
-  // Initialize auth with AsyncStorage persistence for React Native
-  // This is the recommended approach per Firebase documentation
+  // Initialize Firebase Auth with React Native AsyncStorage persistence
+  // This resolves the warning: "You are initializing Firebase Auth for React Native without providing AsyncStorage"
+  // The type assertion is needed because Firebase v12 types may not correctly recognize AsyncStorage
   auth = initializeAuth(app, {
-    persistence: AsyncStorage as any,
+    persistence: AsyncStorage as any, // Provides AsyncStorage for React Native persistence
   });
 
-  debugLog('Firebase Auth initialized successfully');
+  debugLog('Firebase Auth initialized successfully with AsyncStorage persistence');
 } catch (error) {
   // If auth is already initialized, get the existing instance
-  debugLog('Auth already initialized, using existing instance');
+  debugLog('Auth already initialized, using existing instance:', error);
   auth = getAuth(app);
 }
 

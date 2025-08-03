@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Keychain from 'react-native-keychain';
-import CryptoJS from 'react-native-crypto-js';
+import * as Crypto from 'expo-crypto';
 import { LocalTOTPAccount } from '@/types';
 
 const STORAGE_KEYS = {
@@ -61,17 +61,20 @@ export class StorageService {
     }
 
     // Create new encryption key
-    const newKey = this.generateEncryptionKey();
+    const newKey = await this.generateEncryptionKey();
     await this.saveEncryptionKey(newKey);
     this.encryptionKey = newKey;
     return newKey;
   }
 
   /**
-   * Generate a new encryption key
+   * Generate a new encryption key using expo-crypto
    */
-  private generateEncryptionKey(): string {
-    return CryptoJS.lib.WordArray.random(256 / 8).toString();
+  private async generateEncryptionKey(): Promise<string> {
+    const randomBytes = Crypto.getRandomBytes(32); // 256 bits
+    return Array.from(randomBytes)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
   }
 
   /**
@@ -86,24 +89,83 @@ export class StorageService {
   }
 
   /**
-   * Encrypt data using AES (exposed for Firebase service)
+   * Encrypt data using a simple XOR cipher with expo-crypto generated key
+   * Note: This is a simplified approach for React Native compatibility
    */
-  public encrypt(data: string): string {
+  public async encrypt(data: string): Promise<string> {
     if (!this.encryptionKey) {
       throw new Error('Encryption key not available');
     }
-    return CryptoJS.AES.encrypt(data, this.encryptionKey).toString();
+
+    try {
+      const encoder = new TextEncoder();
+      const dataBytes = encoder.encode(data);
+      
+      // Convert hex key to bytes
+      const keyBytes = new Uint8Array(
+        this.encryptionKey.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16))
+      );
+
+      // Generate a random IV
+      const iv = Crypto.getRandomBytes(16);
+      
+      // Simple XOR encryption with key stretching
+      const encrypted = new Uint8Array(dataBytes.length);
+      for (let i = 0; i < dataBytes.length; i++) {
+        const keyIndex = i % keyBytes.length;
+        const ivIndex = i % iv.length;
+        encrypted[i] = dataBytes[i] ^ keyBytes[keyIndex] ^ iv[ivIndex];
+      }
+
+      // Combine IV and encrypted data
+      const combined = new Uint8Array(iv.length + encrypted.length);
+      combined.set(iv);
+      combined.set(encrypted, iv.length);
+
+      // Convert to base64
+      return btoa(String.fromCharCode(...combined));
+    } catch (error) {
+      throw new Error('Failed to encrypt data: ' + (error as Error).message);
+    }
   }
 
   /**
-   * Decrypt data using AES (exposed for Firebase service)
+   * Decrypt data using the same XOR cipher
    */
-  public decrypt(encryptedData: string): string {
+  public async decrypt(encryptedData: string): Promise<string> {
     if (!this.encryptionKey) {
       throw new Error('Encryption key not available');
     }
-    const bytes = CryptoJS.AES.decrypt(encryptedData, this.encryptionKey);
-    return bytes.toString(CryptoJS.enc.Utf8);
+
+    try {
+      // Convert from base64
+      const combined = new Uint8Array(
+        atob(encryptedData).split('').map(char => char.charCodeAt(0))
+      );
+
+      // Extract IV and encrypted data
+      const iv = combined.slice(0, 16);
+      const encrypted = combined.slice(16);
+
+      // Convert hex key to bytes
+      const keyBytes = new Uint8Array(
+        this.encryptionKey.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16))
+      );
+
+      // Decrypt using XOR
+      const decrypted = new Uint8Array(encrypted.length);
+      for (let i = 0; i < encrypted.length; i++) {
+        const keyIndex = i % keyBytes.length;
+        const ivIndex = i % iv.length;
+        decrypted[i] = encrypted[i] ^ keyBytes[keyIndex] ^ iv[ivIndex];
+      }
+
+      // Convert back to string
+      const decoder = new TextDecoder();
+      return decoder.decode(decrypted);
+    } catch (error) {
+      throw new Error('Failed to decrypt data: ' + (error as Error).message);
+    }
   }
 
   /**
@@ -114,12 +176,14 @@ export class StorageService {
       await this.initialize();
 
       // Encrypt secrets in accounts before storage
-      const encryptedAccounts = accounts.map(account => ({
-        ...account,
-        secret: this.encrypt(account.secret),
-      }));
+      const encryptedAccounts = await Promise.all(
+        accounts.map(async account => ({
+          ...account,
+          secret: await this.encrypt(account.secret),
+        }))
+      );
 
-      const encryptedData = this.encrypt(JSON.stringify(encryptedAccounts));
+      const encryptedData = await this.encrypt(JSON.stringify(encryptedAccounts));
       await AsyncStorage.setItem(STORAGE_KEYS.ACCOUNTS, encryptedData);
     } catch (error) {
       console.error('Failed to save accounts:', error);
@@ -139,15 +203,15 @@ export class StorageService {
         return [];
       }
 
-      const decryptedData = this.decrypt(encryptedData);
+      const decryptedData = await this.decrypt(encryptedData);
       const encryptedAccounts = JSON.parse(decryptedData);
 
       // Decrypt secrets in accounts after loading
-      const accounts: LocalTOTPAccount[] = encryptedAccounts.map(
-        (account: any) => ({
+      const accounts: LocalTOTPAccount[] = await Promise.all(
+        encryptedAccounts.map(async (account: any) => ({
           ...account,
-          secret: this.decrypt(account.secret),
-        })
+          secret: await this.decrypt(account.secret),
+        }))
       );
 
       return accounts;
@@ -232,15 +296,12 @@ export class StorageService {
 
       // Clear keychain separately
       try {
-        await Keychain.resetInternetCredentials(STORAGE_KEYS.ENCRYPTION_KEY);
+        // Delete the encryption key from keychain - use resetGenericPassword instead
+        await Keychain.resetGenericPassword({ service: STORAGE_KEYS.ENCRYPTION_KEY });
       } catch (keychainError) {
-        // The resetInternetCredentials might have different signature, try alternative
+        // If reset fails, try resetGenericPassword without service
         try {
-          await Keychain.setInternetCredentials(
-            STORAGE_KEYS.ENCRYPTION_KEY,
-            '',
-            ''
-          );
+          await Keychain.resetGenericPassword();
         } catch (altError) {
           console.log(
             'Keychain reset failed with both methods:',

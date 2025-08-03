@@ -1,6 +1,17 @@
 import { TOTPService } from '../TOTPService';
 
+// Import polyfills for test environment
+import '../../polyfills';
+
 // Mock crypto for testing environment
+declare global {
+  namespace NodeJS {
+    interface Global {
+      crypto: any;
+    }
+  }
+}
+
 (global as any).crypto = {
   getRandomValues: (arr: Uint8Array) => {
     for (let i = 0; i < arr.length; i++) {
@@ -64,7 +75,7 @@ describe('TOTPService', () => {
 
       expect(url).toContain('otpauth://totp/');
       expect(url).toContain('TestApp');
-      expect(url).toContain('user@example.com');
+      expect(url).toContain('user%40example.com'); // @ is URL encoded as %40
       expect(url).toContain('secret=JBSWY3DPEHPK3PXP');
     });
   });
