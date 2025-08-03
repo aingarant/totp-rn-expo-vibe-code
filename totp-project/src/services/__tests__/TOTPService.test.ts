@@ -21,7 +21,7 @@ describe('TOTPService', () => {
     test('should generate a 6-digit TOTP code by default', () => {
       const secret = 'JBSWY3DPEHPK3PXP'; // "Hello World" in Base32
       const code = totpService.generateTOTP(secret);
-      
+
       expect(code).toHaveLength(6);
       expect(code).toMatch(/^\d{6}$/);
     });
@@ -29,7 +29,7 @@ describe('TOTPService', () => {
     test('should validate a correct TOTP code', () => {
       const secret = 'JBSWY3DPEHPK3PXP';
       const code = totpService.generateTOTP(secret);
-      
+
       const isValid = totpService.validateTOTP(code, secret);
       expect(isValid).toBe(true);
     });
@@ -37,7 +37,7 @@ describe('TOTPService', () => {
     test('should reject an incorrect TOTP code', () => {
       const secret = 'JBSWY3DPEHPK3PXP';
       const wrongCode = '000000';
-      
+
       const isValid = totpService.validateTOTP(wrongCode, secret);
       expect(isValid).toBe(false);
     });
@@ -49,7 +49,7 @@ describe('TOTPService', () => {
 
     test('should generate test secrets', () => {
       const secret = totpService.generateTestSecret();
-      
+
       expect(typeof secret).toBe('string');
       expect(secret.length).toBeGreaterThan(0);
       expect(totpService.validateSecret(secret)).toBe(true);
@@ -61,7 +61,7 @@ describe('TOTPService', () => {
         'user@example.com',
         'JBSWY3DPEHPK3PXP'
       );
-      
+
       expect(url).toContain('otpauth://totp/');
       expect(url).toContain('TestApp');
       expect(url).toContain('user@example.com');
