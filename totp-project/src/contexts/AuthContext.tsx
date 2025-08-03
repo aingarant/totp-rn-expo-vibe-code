@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode, useRef } from 'react';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -11,6 +11,7 @@ import {
 import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, COLLECTIONS } from '@/services/firebase';
 import { User, AuthState, ApiResponse } from '@/types';
+import { SessionManager } from '@/services/SessionManager';
 
 interface AuthContextType {
   // State
@@ -24,6 +25,7 @@ interface AuthContextType {
   logOut: () => Promise<ApiResponse>;
   resetPassword: (email: string) => Promise<ApiResponse>;
   updateUserProfile: (updates: Partial<User>) => Promise<ApiResponse<User>>;
+  resetSessionTimer: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,6 +38,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const sessionManagerRef = useRef<SessionManager | null>(null);
 
   // Convert Firebase user to our User type
   const createUserProfile = async (firebaseUser: FirebaseUser): Promise<User> => {
@@ -200,6 +203,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // Initialize session manager
+  useEffect(() => {
+    if (!sessionManagerRef.current) {
+      sessionManagerRef.current = SessionManager.createDefault(() => {
+        logOut();
+      });
+    }
+
+    return () => {
+      if (sessionManagerRef.current) {
+        sessionManagerRef.current.stopSession();
+      }
+    };
+  }, []);
+
+  // Reset session timer (to be called on user activity)
+  const resetSessionTimer = () => {
+    if (sessionManagerRef.current && isAuthenticated) {
+      sessionManagerRef.current.resetActivityTimer();
+    }
+  };
+
   // Listen to auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -208,9 +233,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const userProfile = await createUserProfile(firebaseUser);
           setUser(userProfile);
           setIsAuthenticated(true);
+
+          // Start session management
+          if (sessionManagerRef.current) {
+            sessionManagerRef.current.startSession(userProfile);
+          }
         } else {
           setUser(null);
           setIsAuthenticated(false);
+
+          // Stop session management
+          if (sessionManagerRef.current) {
+            sessionManagerRef.current.stopSession();
+          }
         }
       } catch (error) {
         console.error('Auth state change error:', error);
@@ -233,6 +268,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logOut,
     resetPassword,
     updateUserProfile,
+    resetSessionTimer,
   };
 
   return (

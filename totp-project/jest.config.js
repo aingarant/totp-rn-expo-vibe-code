@@ -1,10 +1,8 @@
 module.exports = {
-  preset: 'react-native',
+  testEnvironment: 'node',
   setupFilesAfterEnv: ['<rootDir>/jest-setup.js'],
   testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/.expo/'],
-  transformIgnorePatterns: [
-    'node_modules/(?!(jest-)?@?react-native|@react-native-community|@react-navigation|otplib|thirty-two)',
-  ],
+  transformIgnorePatterns: ['node_modules/(?!(otplib|thirty-two))'],
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
     '!src/**/*.d.ts',
@@ -13,7 +11,6 @@ module.exports = {
   ],
   coverageReporters: ['text', 'lcov', 'html'],
   coverageDirectory: 'coverage',
-  testEnvironment: 'node',
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',

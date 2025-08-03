@@ -9,7 +9,12 @@
     "web": "expo start --web",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "setup:firebase": "./scripts/setup-firebase.sh",
+    "validate:config": "npm run validate:firebase && npm run validate:env",
+    "validate:firebase": "node -e \"require('./src/config/app.ts').getAppConfig(); console.log('✅ Firebase configuration is valid')\"",
+    "validate:env": "node -e \"const fs = require('fs'); if (!fs.existsSync('.env')) throw new Error('❌ .env file not found. Run: npm run setup:firebase'); console.log('✅ .env file exists')\"",
+    "clean": "npx expo install --fix && npx expo start --clear"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
@@ -19,6 +24,7 @@
     "expo": "~53.0.20",
     "expo-barcode-scanner": "^13.0.1",
     "expo-camera": "^16.1.11",
+    "expo-local-authentication": "^14.0.1",
     "expo-status-bar": "~2.2.3",
     "firebase": "^12.0.0",
     "otplib": "^12.0.1",
@@ -40,10 +46,12 @@
     "@types/react": "~19.0.10",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
     "@typescript-eslint/parser": "^8.38.0",
+    "dotenv": "^17.2.1",
     "eslint": "^9.32.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-native": "^5.0.0",
     "jest": "^30.0.5",
+    "jest-environment-jsdom": "^30.0.5",
     "prettier": "^3.6.2",
     "typescript": "~5.8.3"
   },

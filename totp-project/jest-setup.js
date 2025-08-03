@@ -1,5 +1,3 @@
-import '@testing-library/jest-native/extend-expect';
-
 // Mock AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
@@ -8,10 +6,14 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 // Mock react-native-keychain
 jest.mock('react-native-keychain', () => ({
   setInternetCredentials: jest.fn(() => Promise.resolve()),
-  getInternetCredentials: jest.fn(() => Promise.resolve({ username: '', password: '' })),
+  getInternetCredentials: jest.fn(() =>
+    Promise.resolve({ username: '', password: '' })
+  ),
   resetInternetCredentials: jest.fn(() => Promise.resolve()),
   setGenericPassword: jest.fn(() => Promise.resolve()),
-  getGenericPassword: jest.fn(() => Promise.resolve({ username: '', password: '' })),
+  getGenericPassword: jest.fn(() =>
+    Promise.resolve({ username: '', password: '' })
+  ),
   resetGenericPassword: jest.fn(() => Promise.resolve()),
 }));
 

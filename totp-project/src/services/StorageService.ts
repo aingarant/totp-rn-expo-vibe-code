@@ -86,9 +86,9 @@ export class StorageService {
   }
 
   /**
-   * Encrypt data using AES
+   * Encrypt data using AES (exposed for Firebase service)
    */
-  private encrypt(data: string): string {
+  public encrypt(data: string): string {
     if (!this.encryptionKey) {
       throw new Error('Encryption key not available');
     }
@@ -96,9 +96,9 @@ export class StorageService {
   }
 
   /**
-   * Decrypt data using AES
+   * Decrypt data using AES (exposed for Firebase service)
    */
-  private decrypt(encryptedData: string): string {
+  public decrypt(encryptedData: string): string {
     if (!this.encryptionKey) {
       throw new Error('Encryption key not available');
     }
@@ -254,6 +254,30 @@ export class StorageService {
     } catch (error) {
       console.error('Failed to clear all data:', error);
       throw new Error('Failed to clear all data');
+    }
+  }
+
+  /**
+   * Get last sync timestamp
+   */
+  public async getLastSyncTime(): Promise<number> {
+    try {
+      const timestamp = await AsyncStorage.getItem('@last_sync_time');
+      return timestamp ? parseInt(timestamp) : 0;
+    } catch (error) {
+      console.error('Failed to get last sync time:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Set last sync timestamp
+   */
+  public async setLastSyncTime(timestamp: number): Promise<void> {
+    try {
+      await AsyncStorage.setItem('@last_sync_time', timestamp.toString());
+    } catch (error) {
+      console.error('Failed to set last sync time:', error);
     }
   }
 

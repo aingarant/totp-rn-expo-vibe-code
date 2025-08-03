@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,29 +9,87 @@ import {
   FlatList,
   TextInput,
   Modal,
+  RefreshControl,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '@/contexts/AuthContext';
 import { TOTPItem } from '@/components/TOTPItem';
 import { AddAccountForm } from '@/components/AddAccountForm';
 import { QRCodeScanner } from '@/components/QRCodeScanner';
+import { ActivityDetector } from '@/components/ActivityDetector';
 import { LocalTOTPAccount, QRCodeResult } from '@/types';
 import { TOTPService } from '@/services/TOTPService';
+import { StorageService } from '@/services/StorageService';
+import { FirebaseService } from '@/services/FirebaseService';
 
 const HomeScreen: React.FC = () => {
-  const { user, logOut } = useAuth();
+  const { user, logOut, resetSessionTimer } = useAuth();
   const [accounts, setAccounts] = useState<LocalTOTPAccount[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [editingAccount, setEditingAccount] = useState<LocalTOTPAccount | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const totpService = TOTPService.getInstance();
+  const storageService = StorageService.getInstance();
+  const firebaseService = FirebaseService.getInstance();
+
+  // Load accounts from storage and sync
+  const loadAccounts = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      // Load from local storage first
+      const localAccounts = await storageService.loadAccounts();
+      setAccounts(localAccounts);
+
+      // If user is authenticated and online, sync with Firebase
+      if (user) {
+        try {
+          await firebaseService.syncAccounts(user.uid);
+          // Reload after sync
+          const updatedAccounts = await storageService.loadAccounts();
+          setAccounts(updatedAccounts);
+        } catch (syncError) {
+          console.warn('Sync failed, using local data:', syncError);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load accounts:', error);
+      Alert.alert('Error', 'Failed to load TOTP accounts');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  // Pull-to-refresh handler
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    resetSessionTimer(); // Reset session on user activity
+
+    try {
+      if (user) {
+        // Force sync with cloud
+        await firebaseService.syncAccounts(user.uid);
+        const updatedAccounts = await storageService.loadAccounts();
+        setAccounts(updatedAccounts);
+      } else {
+        // Just reload local data
+        await loadAccounts();
+      }
+    } catch (error) {
+      console.error('Refresh failed:', error);
+      Alert.alert('Sync Error', 'Failed to sync with cloud. Using local data.');
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [user, loadAccounts, resetSessionTimer]);
 
   // Sample data for demonstration - In production, this would come from storage/Firebase
   useEffect(() => {
-    loadSampleAccounts();
-  }, []);
+    loadAccounts();
+  }, [loadAccounts]);
 
   const loadSampleAccounts = () => {
     const sampleAccounts: LocalTOTPAccount[] = [
@@ -170,97 +228,109 @@ const HomeScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <ActivityDetector>
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="dark" />
 
-      <View style={styles.header}>
-        <Text style={styles.title}>Authenticator</Text>
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutButtonText}>Sign Out</Text>
-        </TouchableOpacity>
-      </View>
-
-      {accounts.length > 0 && (
-        <View style={styles.searchContainer}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search accounts..."
-            placeholderTextColor="#999"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
+        <View style={styles.header}>
+          <Text style={styles.title}>Authenticator</Text>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Text style={styles.logoutButtonText}>Sign Out</Text>
+          </TouchableOpacity>
         </View>
-      )}
 
-      <View style={styles.content}>
-        {accounts.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>No Accounts Yet</Text>
-            <Text style={styles.emptySubtitle}>
-              Add your first authenticator account to get started
-            </Text>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => setShowAddForm(true)}
-            >
-              <Text style={styles.addButtonText}>Add Account</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.addButton, styles.scanButton]}
-              onPress={() => setShowQRScanner(true)}
-            >
-              <Text style={styles.addButtonText}>Scan QR Code</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            <FlatList
-              data={filteredAccounts}
-              renderItem={renderAccountItem}
-              keyExtractor={item => item.id}
-              style={styles.accountsList}
-              showsVerticalScrollIndicator={false}
+        {accounts.length > 0 && (
+          <View style={styles.searchContainer}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search accounts..."
+              placeholderTextColor="#999"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
             />
-            <View style={styles.fab}>
+          </View>
+        )}
+
+        <View style={styles.content}>
+          {accounts.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>No Accounts Yet</Text>
+              <Text style={styles.emptySubtitle}>
+                Add your first authenticator account to get started
+              </Text>
               <TouchableOpacity
-                style={styles.fabButton}
+                style={styles.addButton}
                 onPress={() => setShowAddForm(true)}
               >
-                <Text style={styles.fabText}>+</Text>
+                <Text style={styles.addButtonText}>Add Account</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.addButton, styles.scanButton]}
+                onPress={() => setShowQRScanner(true)}
+              >
+                <Text style={styles.addButtonText}>Scan QR Code</Text>
               </TouchableOpacity>
             </View>
-          </>
-        )}
-      </View>
+          ) : (
+            <>
+              <FlatList
+                data={filteredAccounts}
+                renderItem={renderAccountItem}
+                keyExtractor={item => item.id}
+                style={styles.accountsList}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={isRefreshing}
+                    onRefresh={onRefresh}
+                    colors={['#3742fa']}
+                    tintColor="#3742fa"
+                    title="Pull to sync..."
+                    titleColor="#666"
+                  />
+                }
+              />
+              <View style={styles.fab}>
+                <TouchableOpacity
+                  style={styles.fabButton}
+                  onPress={() => setShowAddForm(true)}
+                >
+                  <Text style={styles.fabText}>+</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </View>
 
-      {/* Add Account Modal */}
-      <Modal
-        visible={showAddForm || editingAccount !== null}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <AddAccountForm
-          onSave={editingAccount ? handleEditAccount : handleAddAccount}
-          onCancel={() => {
-            setShowAddForm(false);
-            setEditingAccount(null);
-          }}
-          initialData={editingAccount || undefined}
-        />
-      </Modal>
+        {/* Add Account Modal */}
+        <Modal
+          visible={showAddForm || editingAccount !== null}
+          animationType="slide"
+          presentationStyle="pageSheet"
+        >
+          <AddAccountForm
+            onSave={editingAccount ? handleEditAccount : handleAddAccount}
+            onCancel={() => {
+              setShowAddForm(false);
+              setEditingAccount(null);
+            }}
+            initialData={editingAccount || undefined}
+          />
+        </Modal>
 
-      {/* QR Scanner Modal */}
-      <Modal
-        visible={showQRScanner}
-        animationType="slide"
-        presentationStyle="fullScreen"
-      >
-        <QRCodeScanner
-          onScanSuccess={handleQRScanSuccess}
-          onCancel={() => setShowQRScanner(false)}
-        />
-      </Modal>
-    </SafeAreaView>
+        {/* QR Scanner Modal */}
+        <Modal
+          visible={showQRScanner}
+          animationType="slide"
+          presentationStyle="fullScreen"
+        >
+          <QRCodeScanner
+            onScanSuccess={handleQRScanSuccess}
+            onCancel={() => setShowQRScanner(false)}
+          />
+        </Modal>
+      </SafeAreaView>
+    </ActivityDetector>
   );
 };
 

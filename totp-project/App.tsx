@@ -2,8 +2,8 @@ import React from 'react';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import AuthScreen from '@/screens/AuthScreen';
-import HomeScreen from '@/screens/HomeScreen';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import AppNavigator from '@/navigation/AppNavigator';
 
 // Main app component that handles authentication state
 const AppContent: React.FC = () => {
@@ -13,22 +13,23 @@ const AppContent: React.FC = () => {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3B82F6" />
+        <ActivityIndicator size="large" color="#3742fa" />
       </View>
     );
   }
 
-  // Show appropriate screen based on authentication state
-  return isAuthenticated ? <HomeScreen /> : <AuthScreen />;
+  return <AppNavigator isAuthenticated={isAuthenticated} />;
 };
 
 // Root app component with providers
 export default function App() {
   return (
-    <AuthProvider>
-      <StatusBar style="dark" />
-      <AppContent />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <StatusBar style="dark" />
+        <AppContent />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

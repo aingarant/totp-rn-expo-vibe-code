@@ -1,14 +1,14 @@
 import { TOTPService } from '../TOTPService';
 
 // Mock crypto for testing environment
-global.crypto = {
+(global as any).crypto = {
   getRandomValues: (arr: Uint8Array) => {
     for (let i = 0; i < arr.length; i++) {
       arr[i] = Math.floor(Math.random() * 256);
     }
     return arr;
   },
-} as any;
+};
 
 describe('TOTPService', () => {
   let totpService: TOTPService;
